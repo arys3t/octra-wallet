@@ -20,7 +20,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { Wallet } from '../types/wallet';
-import { getTransactionHistory, fetchTransactionDetails, fetchPendingTransactions } from '../utils/api';
+import { getTransactionHistory, fetchTransactionDetails, fetchPendingTransactionByHash } from '../utils/api';
 import { TransactionDetails, PendingTransaction } from '../types/wallet';
 import { useToast } from '@/hooks/use-toast';
 
@@ -90,9 +90,8 @@ export function TxHistory({ wallet }: TxHistoryProps) {
     
     try {
       if (isPending) {
-        // For pending transactions, fetch from staging
-        const pendingTxs = await fetchPendingTransactions(wallet?.address || '');
-        const pendingTx = pendingTxs.find(tx => tx.hash === hash);
+        // For pending transactions, fetch from staging by hash
+        const pendingTx = await fetchPendingTransactionByHash(hash);
         if (pendingTx) {
           setSelectedTx(pendingTx);
         } else {
@@ -346,6 +345,14 @@ export function TxHistory({ wallet }: TxHistoryProps) {
                                     <span className="font-medium">Has Public Key:</span>
                                     <div>{selectedTx.has_public_key ? 'Yes' : 'No'}</div>
                                   </div>
+                                  {selectedTx.message && (
+                                    <div className="col-span-2">
+                                      <span className="font-medium">Message:</span>
+                                      <div className="mt-1 p-2 bg-muted rounded text-sm">
+                                        {selectedTx.message}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               ) : (
                                 // Confirmed transaction details
@@ -403,23 +410,19 @@ export function TxHistory({ wallet }: TxHistoryProps) {
                                     <span className="font-medium">Source:</span>
                                     <div>{selectedTx.source}</div>
                                   </div>
-                                </div>
-                              )}
-                              
-                              {!isPendingTransaction(selectedTx) && selectedTx.parsed_tx.message && (
-                                <div>
-                                  <span className="font-medium">Message:</span>
-                                  <div className="mt-1 p-2 bg-muted rounded text-sm">
-                                    {selectedTx.parsed_tx.message}
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {!isPendingTransaction(selectedTx) && (
-                                <div>
-                                  <span className="font-medium">Raw Data:</span>
-                                  <div className="mt-1 p-2 bg-muted rounded text-xs font-mono break-all max-h-32 overflow-y-auto">
-                                    {selectedTx.data}
+                                  {selectedTx.parsed_tx.message && (
+                                    <div className="col-span-2">
+                                      <span className="font-medium">Message:</span>
+                                      <div className="mt-1 p-2 bg-muted rounded text-sm">
+                                        {selectedTx.parsed_tx.message}
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div className="col-span-2">
+                                    <span className="font-medium">Raw Data:</span>
+                                    <div className="mt-1 p-2 bg-muted rounded text-xs font-mono break-all max-h-32 overflow-y-auto">
+                                      {selectedTx.data}
+                                    </div>
                                   </div>
                                 </div>
                               )}

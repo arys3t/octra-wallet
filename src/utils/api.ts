@@ -6,7 +6,8 @@ const MU_FACTOR = 1_000_000;
 
 export async function fetchBalance(address: string): Promise<BalanceResponse> {
   try {
-    const response = await fetch(`/api/balance/${address}`);
+    // Use the address endpoint instead of balance endpoint
+    const response = await fetch(`/api/address/${address}`);
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -126,19 +127,13 @@ export async function fetchPendingTransactions(address: string): Promise<Pending
     }
     
     const responseText = await response.text();
-    let data: PendingTransaction[];
+    let data: StagingResponse;
     
     try {
-      // The staging endpoint returns an array directly
       data = JSON.parse(responseText);
       
-      // If it's wrapped in an object, extract the array
-      if (typeof data === 'object' && !Array.isArray(data) && 'pending_transactions' in data) {
-        data = (data as StagingResponse).pending_transactions;
-      }
-      
-      if (!Array.isArray(data)) {
-        console.warn('Staging response is not an array:', data);
+      if (!data.staged_transactions || !Array.isArray(data.staged_transactions)) {
+        console.warn('Staging response does not contain staged_transactions array:', data);
         return [];
       }
     } catch (parseError) {
@@ -147,7 +142,7 @@ export async function fetchPendingTransactions(address: string): Promise<Pending
     }
     
     // Filter transactions for the specific address
-    const userTransactions = data.filter(tx => 
+    const userTransactions = data.staged_transactions.filter(tx => 
       tx.from.toLowerCase() === address.toLowerCase() || 
       tx.to.toLowerCase() === address.toLowerCase()
     );
@@ -156,6 +151,41 @@ export async function fetchPendingTransactions(address: string): Promise<Pending
   } catch (error) {
     console.error('Error fetching pending transactions:', error);
     return [];
+  }
+}
+
+// New function to fetch specific pending transaction by hash
+export async function fetchPendingTransactionByHash(hash: string): Promise<PendingTransaction | null> {
+  try {
+    const response = await fetch(`/api/staging`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to fetch pending transactions:', response.status, errorText);
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+    }
+    
+    const responseText = await response.text();
+    let data: StagingResponse;
+    
+    try {
+      data = JSON.parse(responseText);
+      
+      if (!data.staged_transactions || !Array.isArray(data.staged_transactions)) {
+        console.warn('Staging response does not contain staged_transactions array:', data);
+        return null;
+      }
+    } catch (parseError) {
+      console.error('Failed to parse staging JSON:', parseError);
+      return null;
+    }
+    
+    // Find transaction by hash
+    const transaction = data.staged_transactions.find(tx => tx.hash === hash);
+    return transaction || null;
+  } catch (error) {
+    console.error('Error fetching pending transaction by hash:', error);
+    return null;
   }
 }
 

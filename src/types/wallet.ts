@@ -99,5 +99,7 @@ export interface PendingTransaction {
 }
 
 export interface StagingResponse {
-  pending_transactions: PendingTransaction[];
+  count: number;
+  staged_transactions: PendingTransaction[];
+  message: string;
 }
