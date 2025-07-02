@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GenerateWallet } from './GenerateWallet';
 import { ImportWallet } from './ImportWallet';
-import { Wallet as WalletIcon, Plus, Download, Shield, Zap, Globe } from 'lucide-react';
+import { Wallet as WalletIcon, Plus, Download } from 'lucide-react';
 import { Wallet } from '../types/wallet';
 
 interface WelcomeScreenProps {
@@ -28,22 +28,6 @@ export function WelcomeScreen({ onWalletCreated }: WelcomeScreenProps) {
           <p className="text-xl text-muted-foreground mb-6">
             Your secure gateway to the Octra blockchain
           </p>
-          
-          {/* Features */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div className="flex items-center justify-center space-x-2 p-4 bg-white/50 dark:bg-slate-800/50 rounded-lg">
-              <Shield className="h-5 w-5 text-green-600" />
-              <span className="text-sm font-medium">Secure & Private</span>
-            </div>
-            <div className="flex items-center justify-center space-x-2 p-4 bg-white/50 dark:bg-slate-800/50 rounded-lg">
-              <Zap className="h-5 w-5 text-blue-600" />
-              <span className="text-sm font-medium">Fast Transactions</span>
-            </div>
-            <div className="flex items-center justify-center space-x-2 p-4 bg-white/50 dark:bg-slate-800/50 rounded-lg">
-              <Globe className="h-5 w-5 text-purple-600" />
-              <span className="text-sm font-medium">Decentralized</span>
-            </div>
-          </div>
         </div>
 
         {/* Main Card */}

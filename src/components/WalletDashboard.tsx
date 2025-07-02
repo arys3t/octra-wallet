@@ -69,9 +69,19 @@ export function WalletDashboard({ wallet, onDisconnect }: WalletDashboardProps) 
                 </Avatar>
                 <div>
                   <h1 className="text-xl font-bold">Octra Wallet</h1>
-                  <p className="text-sm text-muted-foreground">
-                    {truncateAddress(wallet.address)}
-                  </p>
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm text-muted-foreground">
+                      {truncateAddress(wallet.address)}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(wallet.address, 'Address')}
+                      className="h-6 w-6 p-0"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
               </div>
               <Badge variant="secondary" className="hidden sm:inline-flex">
@@ -81,14 +91,6 @@ export function WalletDashboard({ wallet, onDisconnect }: WalletDashboardProps) 
 
             <div className="flex items-center space-x-2">
               <ThemeToggle />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(wallet.address, 'Address')}
-              >
-                <Copy className="h-4 w-4 mr-2" />
-                Copy Address
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
