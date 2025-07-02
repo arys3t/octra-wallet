@@ -195,10 +195,12 @@ export function MultiSend({ wallet }: MultiSendProps) {
   if (!wallet) {
     return (
       <Alert>
-        <WalletIcon className="h-4 w-4" />
-        <AlertDescription>
-          No wallet available. Please generate or import a wallet first.
-        </AlertDescription>
+        <div className="flex items-start space-x-3">
+          <WalletIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <AlertDescription>
+            No wallet available. Please generate or import a wallet first.
+          </AlertDescription>
+        </div>
       </Alert>
     );
   }
@@ -215,11 +217,13 @@ export function MultiSend({ wallet }: MultiSendProps) {
       </CardHeader>
       <CardContent className="space-y-6">
         <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Multi-send will create separate transactions for each recipient. 
-            Make sure you have sufficient balance to cover all amounts.
-          </AlertDescription>
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <AlertDescription>
+              Multi-send will create separate transactions for each recipient. 
+              Make sure you have sufficient balance to cover all amounts.
+            </AlertDescription>
+          </div>
         </Alert>
 
         {/* Wallet Info */}
@@ -313,9 +317,9 @@ export function MultiSend({ wallet }: MultiSendProps) {
               >
                 <div className="flex items-start">
                   {result.success ? (
-                    <CheckCircle className="h-5 w-5 text-green-600 mr-2 mt-0.5" />
+                    <CheckCircle className="h-5 w-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
                   ) : (
-                    <AlertTriangle className="h-5 w-5 text-red-600 mr-2 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
                   )}
                   <div className="flex-1">
                     <p className={`text-sm font-medium ${result.success ? 'text-green-800' : 'text-red-800'}`}>

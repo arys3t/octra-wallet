@@ -75,11 +75,13 @@ export function GenerateWallet({ onWalletGenerated }: GenerateWalletProps) {
     return (
       <div className="space-y-4">
         <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Make sure to backup your wallet information securely. 
-            Loss of private key or mnemonic phrase will result in permanent loss of funds.
-          </AlertDescription>
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <AlertDescription>
+              Make sure to backup your wallet information securely. 
+              Loss of private key or mnemonic phrase will result in permanent loss of funds.
+            </AlertDescription>
+          </div>
         </Alert>
 
         <Button 
@@ -107,10 +109,12 @@ export function GenerateWallet({ onWalletGenerated }: GenerateWalletProps) {
   return (
     <div className="space-y-6">
       <Alert className="border-green-200 bg-green-50 dark:bg-green-950">
-        <CheckCircle className="h-4 w-4 text-green-600" />
-        <AlertDescription className="text-green-800 dark:text-green-200">
-          Wallet generated successfully! Please backup the information below.
-        </AlertDescription>
+        <div className="flex items-start space-x-3">
+          <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-green-600" />
+          <AlertDescription className="text-green-800 dark:text-green-200">
+            Wallet generated successfully! Please backup the information below.
+          </AlertDescription>
+        </div>
       </Alert>
 
       {/* Wallet Address */}
@@ -180,11 +184,13 @@ export function GenerateWallet({ onWalletGenerated }: GenerateWalletProps) {
       {/* Backup Confirmation */}
       <div className="space-y-4">
         <Alert>
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>
-            Please confirm that you have securely backed up your wallet information.
-            This includes your private key and mnemonic phrase.
-          </AlertDescription>
+          <div className="flex items-start space-x-3">
+            <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <AlertDescription>
+              Please confirm that you have securely backed up your wallet information.
+              This includes your private key and mnemonic phrase.
+            </AlertDescription>
+          </div>
         </Alert>
 
         <div className="flex items-center space-x-2">

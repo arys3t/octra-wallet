@@ -31,10 +31,18 @@ function App() {
     setWallet(null);
     setWallets([]);
     localStorage.removeItem('wallets');
+    
+    // Reset theme to light when disconnecting
+    localStorage.setItem('octra-wallet-theme', 'light');
+    // Force theme reset by dispatching storage event
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'octra-wallet-theme',
+      newValue: 'light'
+    }));
   };
 
   return (
-    <ThemeProvider defaultTheme="system" storageKey="octra-wallet-theme">
+    <ThemeProvider defaultTheme="light" storageKey="octra-wallet-theme">
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
         {!wallet ? (
           <WelcomeScreen onWalletCreated={saveWallet} />
