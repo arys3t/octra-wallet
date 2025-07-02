@@ -1,5 +1,5 @@
 // api.ts
-import { BalanceResponse, Transaction, AddressHistoryResponse, TransactionDetails } from '../types/wallet';
+import { BalanceResponse, Transaction, AddressHistoryResponse, TransactionDetails, PendingTransaction, StagingResponse } from '../types/wallet';
 import * as nacl from 'tweetnacl';
 
 const MU_FACTOR = 1_000_000;
@@ -114,6 +114,51 @@ export function createTransaction(
   return transaction;
 }
 
+// New function to fetch pending transactions from staging
+export async function fetchPendingTransactions(address: string): Promise<PendingTransaction[]> {
+  try {
+    const response = await fetch(`/api/staging`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Failed to fetch pending transactions:', response.status, errorText);
+      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+    }
+    
+    const responseText = await response.text();
+    let data: PendingTransaction[];
+    
+    try {
+      // The staging endpoint returns an array directly
+      data = JSON.parse(responseText);
+      
+      // If it's wrapped in an object, extract the array
+      if (typeof data === 'object' && !Array.isArray(data) && 'pending_transactions' in data) {
+        data = (data as StagingResponse).pending_transactions;
+      }
+      
+      if (!Array.isArray(data)) {
+        console.warn('Staging response is not an array:', data);
+        return [];
+      }
+    } catch (parseError) {
+      console.error('Failed to parse staging JSON:', parseError);
+      return [];
+    }
+    
+    // Filter transactions for the specific address
+    const userTransactions = data.filter(tx => 
+      tx.from.toLowerCase() === address.toLowerCase() || 
+      tx.to.toLowerCase() === address.toLowerCase()
+    );
+    
+    return userTransactions;
+  } catch (error) {
+    console.error('Error fetching pending transactions:', error);
+    return [];
+  }
+}
+
 // Updated interface to match actual API response
 interface AddressApiResponse {
   address: string;
@@ -131,15 +176,19 @@ interface AddressApiResponse {
 
 export async function fetchTransactionHistory(address: string): Promise<AddressHistoryResponse> {
   try {
-    const response = await fetch(`/api/address/${address}`);
+    // Fetch both confirmed and pending transactions
+    const [confirmedResponse, pendingTransactions] = await Promise.all([
+      fetch(`/api/address/${address}`),
+      fetchPendingTransactions(address)
+    ]);
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Failed to fetch transaction history:', response.status, errorText);
-      throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+    if (!confirmedResponse.ok) {
+      const errorText = await confirmedResponse.text();
+      console.error('Failed to fetch transaction history:', confirmedResponse.status, errorText);
+      throw new Error(`HTTP error! status: ${confirmedResponse.status} - ${errorText}`);
     }
     
-    const responseText = await response.text();
+    const responseText = await confirmedResponse.text();
     let apiData: AddressApiResponse;
     
     try {
@@ -149,8 +198,8 @@ export async function fetchTransactionHistory(address: string): Promise<AddressH
       throw new Error('Invalid JSON response from server');
     }
     
-    // Fetch details for each transaction
-    const transactionPromises = apiData.recent_transactions.map(async (recentTx) => {
+    // Fetch details for each confirmed transaction
+    const confirmedTransactionPromises = apiData.recent_transactions.map(async (recentTx) => {
       try {
         const txDetails = await fetchTransactionDetails(recentTx.hash);
         
@@ -179,10 +228,25 @@ export async function fetchTransactionHistory(address: string): Promise<AddressH
       }
     });
     
-    const transactions = await Promise.all(transactionPromises);
+    const confirmedTransactions = await Promise.all(confirmedTransactionPromises);
+    
+    // Transform pending transactions to our expected format
+    const pendingTransactionsFormatted = pendingTransactions.map(tx => ({
+      hash: tx.hash,
+      from: tx.from,
+      to: tx.to,
+      amount: parseFloat(tx.amount),
+      timestamp: tx.timestamp,
+      status: 'pending' as const,
+      type: tx.from.toLowerCase() === address.toLowerCase() ? 'sent' as const : 'received' as const
+    }));
+    
+    // Combine and sort by timestamp (newest first)
+    const allTransactions = [...pendingTransactionsFormatted, ...confirmedTransactions]
+      .sort((a, b) => b.timestamp - a.timestamp);
     
     const result: AddressHistoryResponse = {
-      transactions,
+      transactions: allTransactions,
       balance: parseFloat(apiData.balance)
     };
     

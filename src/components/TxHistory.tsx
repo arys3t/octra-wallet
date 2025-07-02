@@ -14,11 +14,14 @@ import {
   ArrowDownLeft,
   Wallet as WalletIcon,
   Eye,
-  Copy
+  Copy,
+  Clock,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import { Wallet } from '../types/wallet';
-import { getTransactionHistory, fetchTransactionDetails } from '../utils/api';
-import { TransactionDetails } from '../types/wallet';
+import { getTransactionHistory, fetchTransactionDetails, fetchPendingTransactions } from '../utils/api';
+import { TransactionDetails, PendingTransaction } from '../types/wallet';
 import { useToast } from '@/hooks/use-toast';
 
 interface Transaction {
@@ -38,7 +41,7 @@ interface TxHistoryProps {
 export function TxHistory({ wallet }: TxHistoryProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedTx, setSelectedTx] = useState<TransactionDetails | null>(null);
+  const [selectedTx, setSelectedTx] = useState<TransactionDetails | PendingTransaction | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const { toast } = useToast();
 
@@ -82,12 +85,24 @@ export function TxHistory({ wallet }: TxHistoryProps) {
     }
   };
 
-  const fetchTxDetails = async (hash: string) => {
+  const fetchTxDetails = async (hash: string, isPending: boolean = false) => {
     setLoadingDetails(true);
     
     try {
-      const details = await fetchTransactionDetails(hash);
-      setSelectedTx(details);
+      if (isPending) {
+        // For pending transactions, fetch from staging
+        const pendingTxs = await fetchPendingTransactions(wallet?.address || '');
+        const pendingTx = pendingTxs.find(tx => tx.hash === hash);
+        if (pendingTx) {
+          setSelectedTx(pendingTx);
+        } else {
+          throw new Error('Pending transaction not found');
+        }
+      } else {
+        // For confirmed transactions, fetch details
+        const details = await fetchTransactionDetails(hash);
+        setSelectedTx(details);
+      }
     } catch (error) {
       console.error('Error fetching transaction details:', error);
       toast({
@@ -102,6 +117,15 @@ export function TxHistory({ wallet }: TxHistoryProps) {
 
   useEffect(() => {
     fetchTransactions();
+    
+    // Set up auto-refresh for pending transactions every 30 seconds
+    const interval = setInterval(() => {
+      if (wallet) {
+        fetchTransactions();
+      }
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, [wallet]);
 
   const formatDate = (timestamp: number) => {
@@ -129,6 +153,19 @@ export function TxHistory({ wallet }: TxHistoryProps) {
     }
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'pending':
+        return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'failed':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <Clock className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
   const copyToClipboard = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -145,6 +182,10 @@ export function TxHistory({ wallet }: TxHistoryProps) {
     }
   };
 
+  const isPendingTransaction = (tx: TransactionDetails | PendingTransaction): tx is PendingTransaction => {
+    return 'stage_status' in tx;
+  };
+
   if (!wallet) {
     return (
       <Alert>
@@ -156,12 +197,19 @@ export function TxHistory({ wallet }: TxHistoryProps) {
     );
   }
 
+  const pendingCount = transactions.filter(tx => tx.status === 'pending').length;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
         <CardTitle className="flex items-center gap-2">
           <History className="h-5 w-5" />
           Transaction History
+          {pendingCount > 0 && (
+            <Badge variant="secondary" className="ml-2">
+              {pendingCount} pending
+            </Badge>
+          )}
         </CardTitle>
         <Button
           variant="outline"
@@ -195,6 +243,7 @@ export function TxHistory({ wallet }: TxHistoryProps) {
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
               Found {transactions.length} transactions
+              {pendingCount > 0 && ` (${pendingCount} pending)`}
             </div>
             {transactions.map((tx, index) => (
               <div key={tx.hash || index}>
@@ -208,9 +257,12 @@ export function TxHistory({ wallet }: TxHistoryProps) {
                         <ArrowDownLeft className="h-4 w-4 text-green-500" />
                       )}
                       <span className="font-medium capitalize">{tx.type}</span>
-                      <Badge variant={getStatusColor(tx.status)} className="text-xs">
-                        {tx.status}
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        {getStatusIcon(tx.status)}
+                        <Badge variant={getStatusColor(tx.status)} className="text-xs">
+                          {tx.status}
+                        </Badge>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <Dialog>
@@ -218,7 +270,7 @@ export function TxHistory({ wallet }: TxHistoryProps) {
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => fetchTxDetails(tx.hash)}
+                            onClick={() => fetchTxDetails(tx.hash, tx.status === 'pending')}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -235,62 +287,126 @@ export function TxHistory({ wallet }: TxHistoryProps) {
                             </div>
                           ) : selectedTx ? (
                             <div className="space-y-4">
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <span className="font-medium">Hash:</span>
-                                  <div className="font-mono text-xs break-all flex items-center gap-2">
-                                    {selectedTx.tx_hash}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => copyToClipboard(selectedTx.tx_hash, 'Transaction Hash')}
-                                    >
-                                      <Copy className="h-3 w-3" />
-                                    </Button>
+                              {isPendingTransaction(selectedTx) ? (
+                                // Pending transaction details
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <span className="font-medium">Hash:</span>
+                                    <div className="font-mono text-xs break-all flex items-center gap-2">
+                                      {selectedTx.hash}
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => copyToClipboard(selectedTx.hash, 'Transaction Hash')}
+                                      >
+                                        <Copy className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Status:</span>
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="h-4 w-4 text-yellow-500" />
+                                      <span className="capitalize">{selectedTx.stage_status.replace('_', ' ')}</span>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">From:</span>
+                                    <div className="font-mono text-xs break-all">
+                                      {selectedTx.from}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">To:</span>
+                                    <div className="font-mono text-xs break-all">
+                                      {selectedTx.to}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Amount:</span>
+                                    <div>{selectedTx.amount} OCT</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Priority:</span>
+                                    <div className="capitalize">{selectedTx.priority}</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Nonce:</span>
+                                    <div>{selectedTx.nonce}</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">OU:</span>
+                                    <div>{selectedTx.ou}</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Timestamp:</span>
+                                    <div>{new Date(selectedTx.timestamp * 1000).toLocaleString()}</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Has Public Key:</span>
+                                    <div>{selectedTx.has_public_key ? 'Yes' : 'No'}</div>
                                   </div>
                                 </div>
-                                <div>
-                                  <span className="font-medium">Epoch:</span>
-                                  <div>{selectedTx.epoch}</div>
-                                </div>
-                                <div>
-                                  <span className="font-medium">From:</span>
-                                  <div className="font-mono text-xs break-all">
-                                    {selectedTx.parsed_tx.from}
+                              ) : (
+                                // Confirmed transaction details
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                  <div>
+                                    <span className="font-medium">Hash:</span>
+                                    <div className="font-mono text-xs break-all flex items-center gap-2">
+                                      {selectedTx.tx_hash}
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => copyToClipboard(selectedTx.tx_hash, 'Transaction Hash')}
+                                      >
+                                        <Copy className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Epoch:</span>
+                                    <div>{selectedTx.epoch}</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">From:</span>
+                                    <div className="font-mono text-xs break-all">
+                                      {selectedTx.parsed_tx.from}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">To:</span>
+                                    <div className="font-mono text-xs break-all">
+                                      {selectedTx.parsed_tx.to}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Amount:</span>
+                                    <div>{selectedTx.parsed_tx.amount} OCT</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Amount Raw:</span>
+                                    <div>{selectedTx.parsed_tx.amount_raw}</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Nonce:</span>
+                                    <div>{selectedTx.parsed_tx.nonce}</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">OU:</span>
+                                    <div>{selectedTx.parsed_tx.ou}</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Timestamp:</span>
+                                    <div>{new Date(selectedTx.parsed_tx.timestamp * 1000).toLocaleString()}</div>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Source:</span>
+                                    <div>{selectedTx.source}</div>
                                   </div>
                                 </div>
-                                <div>
-                                  <span className="font-medium">To:</span>
-                                  <div className="font-mono text-xs break-all">
-                                    {selectedTx.parsed_tx.to}
-                                  </div>
-                                </div>
-                                <div>
-                                  <span className="font-medium">Amount:</span>
-                                  <div>{selectedTx.parsed_tx.amount} OCT</div>
-                                </div>
-                                <div>
-                                  <span className="font-medium">Amount Raw:</span>
-                                  <div>{selectedTx.parsed_tx.amount_raw}</div>
-                                </div>
-                                <div>
-                                  <span className="font-medium">Nonce:</span>
-                                  <div>{selectedTx.parsed_tx.nonce}</div>
-                                </div>
-                                <div>
-                                  <span className="font-medium">OU:</span>
-                                  <div>{selectedTx.parsed_tx.ou}</div>
-                                </div>
-                                <div>
-                                  <span className="font-medium">Timestamp:</span>
-                                  <div>{new Date(selectedTx.parsed_tx.timestamp * 1000).toLocaleString()}</div>
-                                </div>
-                                <div>
-                                  <span className="font-medium">Source:</span>
-                                  <div>{selectedTx.source}</div>
-                                </div>
-                              </div>
-                              {selectedTx.parsed_tx.message && (
+                              )}
+                              
+                              {!isPendingTransaction(selectedTx) && selectedTx.parsed_tx.message && (
                                 <div>
                                   <span className="font-medium">Message:</span>
                                   <div className="mt-1 p-2 bg-muted rounded text-sm">
@@ -298,27 +414,32 @@ export function TxHistory({ wallet }: TxHistoryProps) {
                                   </div>
                                 </div>
                               )}
-                              <div>
-                                <span className="font-medium">Raw Data:</span>
-                                <div className="mt-1 p-2 bg-muted rounded text-xs font-mono break-all max-h-32 overflow-y-auto">
-                                  {selectedTx.data}
+                              
+                              {!isPendingTransaction(selectedTx) && (
+                                <div>
+                                  <span className="font-medium">Raw Data:</span>
+                                  <div className="mt-1 p-2 bg-muted rounded text-xs font-mono break-all max-h-32 overflow-y-auto">
+                                    {selectedTx.data}
+                                  </div>
                                 </div>
-                              </div>
+                              )}
                             </div>
                           ) : (
                             <div>No details available</div>
                           )}
                         </DialogContent>
                       </Dialog>
-                      <Button variant="ghost" size="sm" asChild>
-                        <a
-                          href={`https://octrascan.io/tx/${tx.hash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      </Button>
+                      {tx.status === 'confirmed' && (
+                        <Button variant="ghost" size="sm" asChild>
+                          <a
+                            href={`https://octrascan.io/tx/${tx.hash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      )}
                     </div>
                   </div>
 

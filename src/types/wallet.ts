@@ -82,3 +82,22 @@ export interface TransactionDetails {
   data: string;
   source: string;
 }
+
+// New interface for pending transactions from staging
+export interface PendingTransaction {
+  hash: string;
+  from: string;
+  to: string;
+  amount: string;
+  nonce: number;
+  ou: string;
+  timestamp: number;
+  stage_status: string;
+  has_public_key: boolean;
+  message: string | null;
+  priority: string;
+}
+
+export interface StagingResponse {
+  pending_transactions: PendingTransaction[];
+}
